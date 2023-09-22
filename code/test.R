@@ -45,13 +45,13 @@ m <- ncol(x)  # number of covariates
 k <- 3        # number of archetypes
 
 # slopes and intercepts
-beta  <- normal(0, 1, dim = c(k, m))
+beta  <- normal(0, 1, dim = c(k, m))  # need to be ordered variable?
 beta0 <- normal(-1, 0.5, dim = p)   # using the known input in ecomix, for now
 
 # probability of archetype assignment
-# not sure about the prior, using an uninformative prior like the ones in 
+# not sure about the prior, using a weak prior like the ones in 
 # stable isotope models
-z <- dirichlet(t(rep(1, k)), n_realisations = p)
+z <- dirichlet(t(rep(1/k, k)), n_realisations = p)
 
 # linear predictor
 eta <- x %*% t(beta) %*% t(z)
@@ -64,27 +64,20 @@ distribution(y) <- bernoulli(prob)
 mod <- model(beta, beta0, z)
 
 # optimisation / draws
-o <- opt(mod, max_iterations = 1e3)   # try rerunning this a few times to see the "misalignment" shown below
-draws <- mcmc(mod)
+draws <- mcmc(mod, 
+              sampler = hmc(15, 20),
+              # initial_values = initials(beta = beta_true),
+              chain = 1)
 
 
 
 
 # Diagnostics -------------------------------------------------------------
 
-# compare coefficients from MAP estimation
-# the coefs don't always "align", because the archetype indices are not aligned?
-# e.g., sometimes the rows in betas are incorrect
-# Not sure if this is why they defined outcomes as an ordered variable in Stan?
-# See https://mc-stan.org/docs/stan-users-guide/summing-out-the-responsibility-parameter.html
-beta_true; o$par$beta
-plot(beta_true, o$par$beta)
-abline(0, 1)   
-
-# compare archetype classification
-attr(simulated_data, "SAMs")
-apply(o$par$z, 1, which.max)  # lousy way, sometimes misaligned
-
-# quite obvious switching between chains due to sampling of z
+# look for label switching across chains
 library(bayesplot)
 mcmc_trace(draws) 
+
+mcmc_intervals(draws, regex_pars = "beta\\[")
+beta_sim <- calculate(beta, values = draws, nsim = 1000)
+apply(beta_sim$beta, 2:3, mean); beta_true  # label switched but in reality we don't really care?
