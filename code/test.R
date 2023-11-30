@@ -33,6 +33,7 @@ simulated_data <-
 # greta -------------------------------------------------------------------
 
 library(greta)
+source("code/util.R")
 
 # data
 y <- as.matrix(simulated_data[, 1:20])
@@ -45,7 +46,9 @@ m <- ncol(x)  # number of covariates
 k <- 3        # number of archetypes
 
 # slopes and intercepts
-beta  <- normal(0, 1, dim = c(k, m))  # need to be ordered variable?
+# beta  <- normal(0, 1, dim = c(k, m))  # need to be ordered variable?
+beta <- triangular_ordered_matrix(k, m)
+
 beta0 <- normal(-1, 0.5, dim = p)   # using the known input in ecomix, for now
 
 # probability of archetype assignment
@@ -67,7 +70,7 @@ mod <- model(beta, beta0, z)
 draws <- mcmc(mod, 
               sampler = hmc(15, 20),
               # initial_values = initials(beta = beta_true),
-              chain = 1)
+              chain = 1)  # I presume we need one chain to avoid label switching?
 
 
 
@@ -76,8 +79,9 @@ draws <- mcmc(mod,
 
 # look for label switching across chains
 library(bayesplot)
-mcmc_trace(draws) 
+mcmc_trace(draws, regex_pars = "beta\\[") 
+mcmc_trace(draws, regex_pars = "z") 
 
 mcmc_intervals(draws, regex_pars = "beta\\[")
 beta_sim <- calculate(beta, values = draws, nsim = 1000)
-apply(beta_sim$beta, 2:3, mean); beta_true  # label switched but in reality we don't really care?
+apply(beta_sim$beta, 2:3, median); beta_true  # label switched but in reality we don't really care?
