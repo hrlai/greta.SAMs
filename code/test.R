@@ -45,11 +45,17 @@ p <- ncol(y)  # number of species
 m <- ncol(x)  # number of covariates
 k <- 3        # number of archetypes
 
-# slopes and intercepts
+# archetype slopes
 # beta  <- normal(0, 1, dim = c(k, m))  # need to be ordered variable?
 beta <- triangular_ordered_matrix(k, m)
 
+# species intercepts
 beta0 <- normal(-1, 0.5, dim = p)   # using the known input in ecomix, for now
+
+# site intercepts
+sd_alpha <- exponential(1)
+z_alpha  <- normal(0, 1, dim = n)
+alpha    <- z_alpha * sd_alpha
 
 # probability of archetype assignment
 # not sure about the prior, using a weak prior like the ones in 
@@ -59,17 +65,18 @@ z <- dirichlet(t(rep(1/k, k)), n_realisations = p)
 # linear predictor
 eta <- x %*% t(beta) %*% t(z)
 eta <- sweep(eta, 2, beta0, "+")
+eta <- sweep(eta, 1, alpha, "+")
 prob <- ilogit(eta)
 
 # likelihood and model
 distribution(y) <- bernoulli(prob)
 
-mod <- model(beta, beta0, z)
+mod <- model(beta, beta0, alpha, z)
 
 # optimisation / draws
 draws <- mcmc(mod, 
               sampler = hmc(15, 20),
-              # initial_values = initials(beta = beta_true),
+              # initial_values = initials(beta = beta_true),  # potentially using kmeans here
               chain = 1)  # I presume we need one chain to avoid label switching?
 
 
